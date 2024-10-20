@@ -34,8 +34,8 @@ from ssh_server import *
 import paramiko
 import threading
 import logging
-logging.basicConfig(level=logging.INFO)  # 或者其他适当的级别
-paramiko.util.log_to_file("paramiko.log")  # 将日志输出到文件
+logging.basicConfig(level=logging.INFO)  
+paramiko.util.log_to_file("paramiko.log")  # paramiko.log
 SSH_BANNER = "SSH-2.0-OpenSSH_8.3"
 host_key = paramiko.RSAKey(filename='test_rsa.key')
 
@@ -312,40 +312,40 @@ class amun_reqhandler(asynchat.async_chat):
 		try:
 			### wzh
 			if not self.socket:
-				return  # 如果 socket 已经无效，直接返回
+				return  # invalid socket
 
 			try:
 				bytes = self.recv(self.in_buffer_size)
 			except socket.error as e:
-				if e[0] == 110:  # [Errno 110] 超时
+				if e[0] == 110: 
 					self.log_obj.log("connection timeout", 9, "warn", False, True)
 				else:
 					self.log_obj.log("[handle_read] socket error: %s" % e, 9, "crit", False, True)
-				bytes = ""  # 在捕获异常时，将数据置为空，继续流程
+				bytes = ""  
 
 			### wzh
 			local_ip, local_port = self.socket.getsockname()
-			# 检查是否是SSH端口 (2222)
+			# port check ssh
 			if local_port == 2222:
-				self.handle_special_port_connection(bytes)  # 特殊端口的处理逻辑
-
+				client_ip, client_port = self.socket.getpeername()
+				self.handle_special_port_connection(bytes, client_ip) 
 			else:
-				self.collect_incoming_data(bytes)  # 执行正常逻辑
+				self.collect_incoming_data(bytes)  # amun logic
 
 		except KeyboardInterrupt:
-			raise  # 捕获中断信号并继续抛出
+			raise  
 
-		### wzh: 捕获其他socket错误
+		### wzh
 		except socket.error as e:
 			if e.errno == 9:  # Bad file descriptor
 				self.log_obj.log("Bad file descriptor: %s" % e)
 			else:
 				self.log_obj.log("Error handling request: %s" % e)
-			self.close()  # 关闭无效的套接字
+			self.close()  # close invalid socket
 			traceback.print_exc()
 
 	### WZH
-	def handle_special_port_connection(self, bytes):
+	def handle_special_port_connection(self, bytes, client_ip):
 		self.log_obj.log("Handling special connection on port 2222")
 		self.log_obj.log("Socket state before starting transport: {}".format(self.socket.fileno()))
 
@@ -355,7 +355,6 @@ class amun_reqhandler(asynchat.async_chat):
 			transport = paramiko.Transport(self.socket)
 			transport.add_server_key(host_key)
 			transport.local_version = SSH_BANNER
-			client_ip, client_port = self.socket.getsockname()
 			self.log_obj.log("SSH connection from {}".format(client_ip))
 			
 			server = MySSHServer(client_ip=client_ip, username='root', password=None)
