@@ -351,7 +351,7 @@ class amun_reqhandler(asynchat.async_chat):
 
 
 		try:
-			# 将当前的 socket 转换为 paramiko Transport
+			# convert socket to paramiko Transport
 			transport = paramiko.Transport(self.socket)
 			transport.add_server_key(host_key)
 			transport.local_version = SSH_BANNER
@@ -359,7 +359,7 @@ class amun_reqhandler(asynchat.async_chat):
 			
 			server = MySSHServer(client_ip=client_ip, username='root', password=None)
 			
-			# 开始 SSH 会话
+			# start SSH session
 			transport.start_server(server=server)
 
 
