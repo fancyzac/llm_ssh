@@ -285,7 +285,7 @@ class amun_reqhandler(asynchat.async_chat):
 
 	
 			timer.start()
-			emulated_shell(channel,timeout_event=timeout_event,log_obj=self.log_obj)
+			emulated_shell(channel,timeout_event=timeout_event,log_obj=self.log_obj,client_ip=self.remote_ip)
 
 		except socket.timeout:
 			self.log_obj.log("SSH connection timed out.")
