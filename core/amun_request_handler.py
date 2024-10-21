@@ -34,9 +34,9 @@ from ssh_server import *
 import paramiko
 import threading
 import logging
-logging.basicConfig(level=logging.INFO)  
+#logging.basicConfig(level=logging.INFO)  
 paramiko.util.log_to_file("paramiko.log")  # paramiko.log
-SSH_BANNER = "SSH-2.0-OpenSSH_8.3"
+SSH_BANNER = "SSH-2.0-OpenSSH_7.4"
 host_key = paramiko.RSAKey(filename='test_rsa.key')
 
 ### core modules
@@ -75,6 +75,13 @@ class amun_reqhandler(asynchat.async_chat):
 		self.log_obj = amun_logging.amun_logging("amun_request_handler", divLogger['requestHandler'])
 		self.telnet = False
 		#self.attacker_ip = {}
+
+		### wzh
+		self.currentConnections = {}
+		self.vuln_modules = {}
+		self.currentSockets = {}
+		self.event_dict = {} 
+		
 
 	def __del__(self):
 		pass
@@ -192,6 +199,13 @@ class amun_reqhandler(asynchat.async_chat):
 		try:
 			(self.remote_ip, self.remote_port) = socket_object.getpeername()
 			(self.own_ip, self.own_port) = socket_object.getsockname()
+			
+			### WZH
+			# special handle ssh port connection
+			if self.own_port == 2222:
+				self.handle_ssh_port_connection(socket_object)
+				return
+
 			self.identifier = "%s%s%s%s" % (self.remote_ip,self.remote_port,self.own_ip,self.own_port)
 		except socket.error, e:
 			### 107: Transport endpoint is not connected
@@ -232,6 +246,63 @@ class amun_reqhandler(asynchat.async_chat):
 			### handle welcome messages
 			self.handle_welcome()
 
+
+		
+	### WZH
+	def handle_ssh_port_connection(self, socket_object):
+		self.log_obj.log("Handling special connection on port 2222")
+		self.log_obj.log("Socket state before starting transport: {}".format(socket_object.fileno()))
+		timeout_event = threading.Event()
+
+		def timeout_handler():
+			if socket_object and not socket_object.fileno() != -1:
+				print "Connection to {} timed out.".format(self.remote_ip)
+				socket_object.close()
+
+		timer = threading.Timer(100.0, timeout_handler)
+
+		try:
+			
+			# convert socket to paramiko Transport
+			transport = paramiko.Transport(socket_object)
+			transport.add_server_key(host_key)
+			transport.local_version = SSH_BANNER
+			self.log_obj.log("SSH connection from {}".format(self.remote_ip))
+
+			server = MySSHServer(client_ip=self.remote_ip, username='root', password=None)
+
+			# start SSH session
+			transport.start_server(server=server)
+
+			# Wait for a channel
+			channel = transport.accept(100)
+			if channel is None:
+				self.log_obj.log("No channel was opened.")
+				return
+
+			standard_banner = "Welcome to Ubuntu 22.04 LTS (Jammy Jellyfish)!\r\n\r\n"
+			channel.send(standard_banner)
+
+	
+			timer.start()
+			emulated_shell(channel,timeout_event=timeout_event,log_obj=self.log_obj)
+
+		except socket.timeout:
+			self.log_obj.log("SSH connection timed out.")
+		except paramiko.SSHException as e:
+			self.log_obj.log("SSH Exception: {}".format(e))
+		except Exception as e:
+			self.log_obj.log("Error handling SSH connection: {}".format(e))
+		finally:
+			timer.cancel()
+			try:
+				transport.close()
+				if 'initial_connections' in self.event_dict and self.identifier in self.event_dict['initial_connections']:
+					del self.event_dict['initial_connections'][self.identifier]
+				self.log_obj.log("Connection closed for identifier: {}".format(self.identifier))
+			except Exception as e:
+				self.log_obj.log("Error closing transport: {}".format(e))
+			
 	def handle_welcome(self):
 		### get registered vuln modules for own_port
 		if not self.currentConnections.has_key(self.identifier):
@@ -324,13 +395,13 @@ class amun_reqhandler(asynchat.async_chat):
 				bytes = ""  
 
 			### wzh
-			local_ip, local_port = self.socket.getsockname()
+			#local_ip, local_port = self.socket.getsockname()
 			# port check ssh
-			if local_port == 2222:
-				client_ip, client_port = self.socket.getpeername()
-				self.handle_special_port_connection(bytes, client_ip) 
-			else:
-				self.collect_incoming_data(bytes)  # amun logic
+			#if local_port == 2222:
+				#client_ip, client_port = self.socket.getpeername()
+				#self.handle_special_port_connection(bytes, client_ip) 
+			#else:
+			self.collect_incoming_data(bytes)  # amun logic
 
 		except KeyboardInterrupt:
 			raise  
@@ -343,40 +414,6 @@ class amun_reqhandler(asynchat.async_chat):
 				self.log_obj.log("Error handling request: %s" % e)
 			self.close()  # close invalid socket
 			traceback.print_exc()
-
-	### WZH
-	def handle_special_port_connection(self, bytes, client_ip):
-		self.log_obj.log("Handling special connection on port 2222")
-		self.log_obj.log("Socket state before starting transport: {}".format(self.socket.fileno()))
-
-
-		try:
-			# convert socket to paramiko Transport
-			transport = paramiko.Transport(self.socket)
-			transport.add_server_key(host_key)
-			transport.local_version = SSH_BANNER
-			self.log_obj.log("SSH connection from {}".format(client_ip))
-			
-			server = MySSHServer(client_ip=client_ip, username='root', password=None)
-			
-			# start SSH session
-			transport.start_server(server=server)
-
-
-        	# Wait for a channel
-			channel = transport.accept(100)
-			if channel is None:
-				self.log_obj.log("No channel was opened.")
-				return
-
-			channel.send("SSH-2.0-MySSHServer_1.0\r\n")
-			channel.send("Welcome to Ubuntu 22.04 LTS (Jammy Jellyfish)!\r\n\r\n".encode('utf-8'))
-			emulated_shell(channel)
-
-		except Exception as e:
-			self.log_obj.log("Error handling SSH connection: {}".format(e))
-		finally:
-			transport.close()
 
 	
 	def collect_incoming_data(self, data):
@@ -759,6 +796,7 @@ class amun_reqhandler(asynchat.async_chat):
 					self.shutdown(socket.SHUT_RDWR)
 				except:
 					pass
+				
 				if self.event_dict['initial_connections'].has_key(self.identifier):
 					del self.event_dict['initial_connections'][self.identifier]
 				self.connected = False
