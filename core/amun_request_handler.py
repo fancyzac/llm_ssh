@@ -125,7 +125,7 @@ class amun_reqhandler(asynchat.async_chat):
 					(result,state) = self.handle_vulnerabilities("", item[2])
 
 					### wzh
-					if vulnResult is None or 'accept' not in vulnResult:
+					if result is None or 'accept' not in result:
 						return
 
 					### check for shellcode and start download manager
