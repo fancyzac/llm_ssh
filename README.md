@@ -59,3 +59,47 @@ All logging information are stored in the "logs" subdirectory of your Amun insta
 ## Parameters
 
 Amun can be executed with `-a` parameter to analyse a given file for known shellcode instead of running the honeypot. 
+
+# Amun SSH Extensions
+
+Amun is a Python-based low-interaction honeypot inspired by Nepenthes. It extends capabilities with more sophisticated emulation and easier maintenance. This version includes SSH-specific extensions to enhance interaction using a Large Language Model (LLM).
+
+---
+
+## Requirements
+
+### Core Amun Honeypot
+- **Python 2.6 or 2.7** (Python 3 is not supported for the core honeypot).
+- **Optional**:
+  - [Psyco](http://psyco.sourceforge.net/) for performance improvement (Python 2.x only).
+  - **MySQLdb**: Required if `submit-mysql` or `log-mysql` is enabled.
+  - **psycopg2**: Required if `log-surfnet` is enabled.
+
+### SSH Extensions
+- **Python 3** for `llm_shell.py` and `shellcodeAnalyzer.py`.
+
+---
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/MistContinousDoing/Amun-ssh.git
+   cd Amun-ssh
+## Running guidance
+Step 1: Prepare SSH Extensions (Python 3)
+Create and activate a Python 3 virtual environment:
+```bash
+python3 -m venv llm_env
+source llm_env/bin/activate
+```
+Step2: Run the SSH-related scripts:
+```bash
+python3 shellcodeAnalyzer.py
+python3 llm_shell.py
+```
+Step 3: Start the Core Honeypot (Python 2.7)
+Open a new terminal and run the core honeypot:
+```bash
+sudo python2.7 amun_server.py
+```
