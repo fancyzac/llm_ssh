@@ -6,9 +6,9 @@ import requests # type: ignore
 from openai import OpenAI # type: ignore
 from flask import Flask, request  # type: ignore
 
-API_KEY = "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"
-BASE_URL = "https://openrouter.ai/api/v1"
-MODEL = "gpt-4o-mini"
+API_KEY = "sk-bibm5cCenbAH9XO3SvcXOrzTbtsRwBi01nOA7kEysKMeTvDA"
+BASE_URL = "https://api.gpts.vin/v1"
+MODEL = "gpt-4"
 
 # llm api responses
 def get_response(message):
