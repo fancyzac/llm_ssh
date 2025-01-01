@@ -4,6 +4,14 @@ import requests
 
 app = Flask(__name__)
 
+file_system = {
+    "/etc/passwd": "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n...",
+    "/etc/hostname": "amun-server\n",
+    "/var/log/messages": "[2024-01-01 12:00:00] System started\n[2024-01-01 12:05:00] Connection received from 192.168.1.10\n",
+    "/home/user/.bashrc": "export PATH=/usr/local/bin:$PATH\nalias ll='ls -la'\n",
+    "/home/user/notes.txt": "TODO: Learn Python\nTODO: Write more shell commands\n",
+}
+
 # Predefined command responses for Linux and Windows
 game_result = {
     "linux": {
@@ -54,6 +62,27 @@ Windows IP Configuration
 # Command history for context
 command_history = {}
 
+# 动态生成 Prompt
+def generate_prompt(command, history, system_type, file_system):
+    """
+    动态生成 Prompt，注入文件系统结构
+    """
+    history_context = "\n".join([f"$ {cmd}\n{output}" for cmd, output in history.items()]) if history else ""
+    file_system_info = "\n".join([f"{path}: {repr(content[:30])}..." for path, content in file_system.items()])
+
+    prompt = f"""
+You are a simulated {system_type} shell. Here is the file system structure and contents:
+{file_system_info}
+
+Based on the following history:
+{history_context}
+
+Execute the following command:
+{command}
+
+If the command involves accessing files, use the provided file system data. If the command cannot be executed, respond with appropriate errors like "No such file or directory" or "command not found." Make your output concise and accurate.
+"""
+    return prompt
 
 # Function to call the LLM for dynamic responses
 def get_response_from_llm(command, history=None, system_type="linux"):
@@ -61,15 +90,10 @@ def get_response_from_llm(command, history=None, system_type="linux"):
     Calls the LLM API for dynamic response generation based on system type.
     - Ensures the response is properly encoded to UTF-8.
     """
-    history_context = "\n".join([f"$ {cmd}\n{output}" for cmd, output in history.items()]) if history else ""
-    prompt = f"""
-Never mention that you're an ai, you are a {system_type} shell. Based on the following history:
-{history_context}
-Output {command} corresponding to the example output.
-"""
+    prompt = generate_prompt(command, history, system_type, file_system)
     response = requests.post(
         "https://api.gpts.vin/v1/chat/completions",
-        headers={"Authorization": "Bearer sk-bibm5cCenbAH9XO3SvcXOrzTbtsRwBi01nOA7kEysKMeTvDA"},
+        headers={"Authorization": "Bearer sk-OiUqzSnmLNMdv878yw1iAcWeslqE0s1BXoh43yJ7Y3AfFaEb"},
         json={
             "model": "gpt-4",
             "messages": [
@@ -137,5 +161,3 @@ def handle_command():
 # Flask application entry point
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=12345)
-
-
